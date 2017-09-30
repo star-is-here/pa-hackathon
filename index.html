@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Proof of Concept</title>
+<link rel="stylesheet" type="text/css" href="css/leaflet.css">
+<script src="js/leaflet.js"></script>
+<!-- <script src="js/jquery-3.2.1.min.js"></script> -->
+<script src="js/leaflet-omnivore.min.js"></script>
+<script src="js/Leaflet.VectorGrid.bundled.js"></script>
+<style type="text/css">
+    html, body { width: 100%; height: 100%; margin: 0; }
+    #map { width: 100%; height:100%; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script type="text/javascript">
+    var layer = L.tileLayer('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png');
+    var map = L.map('map', {
+        layers: [layer],
+        center: [41.203323, -77.194527],
+        zoom: 8
+    });
+    map.attributionControl.setPrefix('Proof of Concept');
+    map.options.maxZoom = 15;
+    map.options.minZoom = 7;
+
+    var stateLayer = L.geoJson(null, {
+        style: function(feature, layer){
+            return {
+                color: "#ecf0f1",
+                opacity: 0.1,
+                weight: 5,
+                fillOpacity: 0.05
+            }
+        }
+    })
+
+    omnivore.geojson('raster/PA.geojson', null, stateLayer).addTo(map);
+    // omnivore.topojson('data/grid.topojson').addTo(map);
+
+    // Add large TopoJSON
+    fetch('raster/grid.topojson').then(function(response){
+            return response.json();
+        }).then(function(json){
+
+            console.log(json);
+
+            // Accident Layer
+            var accGrid = L.vectorGrid.slicer( json, {
+                rendererFactory: L.canvas.tile,
+                vectorTileLayerStyles: {
+                    'grid': function(properties, zoom) {
+                        // console.log(properties);
+                        // var opa_acc = properties.prob_acc / 2;
+                        // console.log(opa_acc)
+                        return {
+                            fillColor: '#3498db',
+                            fillOpacity: properties.accidents * 3,
+                            stroke: properties.accidents > 0 ? true : false,
+                            fill: true,
+                            color: '#bdc3c7',
+                            weight: .01,
+                        }
+                    }
+                }
+
+            });
+
+            // Fatal Layer
+            var fatalGrid = L.vectorGrid.slicer( json, {
+                rendererFactory: L.canvas.tile,
+                vectorTileLayerStyles: {
+                    'grid': function(properties, zoom) {
+                        // console.log(properties);
+                        return {
+                            fillColor: '#e74c3c',
+                            fillOpacity: properties.fatality * 3,
+                            stroke: properties.fatality > 0 ? true : false,
+                            fill: true,
+                            color: '#bdc3c7',
+                            weight: .01,
+                        }
+                    }
+                }
+
+            });
+
+            // Injury Layer
+            var injuryGrid = L.vectorGrid.slicer( json, {
+                rendererFactory: L.canvas.tile,
+                vectorTileLayerStyles: {
+                    'grid': function(properties, zoom) {
+                        // console.log(properties);
+                        return {
+                            fillColor: '#f1c40f',
+                            fillOpacity: properties.injury / 2,
+                            stroke: properties.injury > 0 ? true : false,
+                            fill: true,
+                            color: '#bdc3c7',
+                            weight: .01,
+                        }
+                    }
+                }
+
+            });
+
+            // Base Risk
+            var riskGrid = L.vectorGrid.slicer( json, {
+                rendererFactory: L.canvas.tile,
+                vectorTileLayerStyles: {
+                    'grid': function(properties, zoom) {
+                        // console.log(properties);
+                        var baseRisk = properties.accidents * properties.fatality *  properties.injury;
+                        return {
+                            fillColor: '#2ecc71',
+                            fillOpacity: baseRisk * 2000,
+                            stroke: baseRisk > 0 ? true : false,
+                            fill: true,
+                            color: '#bdc3c7',
+                            weight: .01,
+                        }
+                    }
+                }
+
+            });
+
+            // Real Time Risk
+            var realGrid = L.vectorGrid.slicer( json, {
+                rendererFactory: L.canvas.tile,
+                vectorTileLayerStyles: {
+                    'grid': function(properties, zoom) {
+                        // console.log(properties);
+                        var realRisk = properties.prob_injury * 0.5;
+                        return {
+                            fillColor: '#9b59b6',
+                            fillOpacity: realRisk * 2,
+                            stroke: realRisk > 0 ? true : false,
+                            fill: realRisk > .075 ? true : false,
+                            color: '#bdc3c7',
+                            weight: .01,
+                        }
+                    }
+                }
+
+            });
+
+            // Base + Real Time Risk
+            var bothGrid = L.vectorGrid.slicer( json, {
+                rendererFactory: L.canvas.tile,
+                vectorTileLayerStyles: {
+                    'grid': function(properties, zoom) {
+                        // console.log(properties);
+                        var realRisk = properties.prob_injury * 0.5;
+                        var bothRisk = (properties.accidents * properties.fatality *  properties.injury * 1000) + (realRisk > .075 ? realRisk : 0);
+                        return {
+                            fillColor: '#fff',
+                            fillOpacity: bothRisk,
+                            stroke: realRisk > 0 ? true : false,
+                            fill: true,
+                            color: '#bdc3c7',
+                            weight: .01,
+                        }
+                    }
+                }
+
+            }).addTo(map);
+
+
+        var probMaps = {
+            'Base Risk': riskGrid,
+            'Real Time Risk Factors': realGrid,
+            'Base + Real Time Risk': bothGrid
+        };
+
+        var statMaps = {
+            'Crashes': accGrid,
+            'Fatalities': fatalGrid,
+            'Injuries': injuryGrid,
+        };
+
+        L.control.layers(probMaps, statMaps).addTo(map);
+
+        });
+
+    // Fatality Layer
+    // fetch('data/grid.topojson').then(function(response){
+    //         return response.json();
+    //     }).then(function(json){
+
+    //         console.log(json);
+
+    //         var fatalGrid = L.vectorGrid.slicer( json, {
+    //             rendererFactory: L.canvas.tile,
+    //             vectorTileLayerStyles: {
+    //                 'grid': function(properties, zoom) {
+    //                     // console.log(properties);
+    //                     return {
+    //                         fillColor: '#e74c3c',
+    //                         fillOpacity: properties.prob_fatal * 3,
+    //                         stroke: properties.prob_fatal > 0 ? true : false,
+    //                         fill: true,
+    //                         color: '#bdc3c7',
+    //                         weight: .01,
+    //                     }
+    //                 }
+    //             }
+
+    //         }).addTo(map);
+
+
+    //         var injuryGrid = L.vectorGrid.slicer( json, {
+    //             rendererFactory: L.canvas.tile,
+    //             vectorTileLayerStyles: {
+    //                 'grid': function(properties, zoom) {
+    //                     // console.log(properties);
+    //                     return {
+    //                         fillColor: '#f1c40f',
+    //                         fillOpacity: properties.prob_injury * 3,
+    //                         stroke: properties.prob_injury > 0 ? true : false,
+    //                         fill: true,
+    //                         color: '#bdc3c7',
+    //                         weight: .01,
+    //                     }
+    //                 }
+    //             }
+
+    //         }).addTo(map);
+    //     });
+
+    // Injury Layer
+    // fetch('data/grid.topojson').then(function(response){
+    //         return response.json();
+    //     }).then(function(json){
+
+    //         console.log(json);
+
+    //         var vectorGrid = L.vectorGrid.slicer( json, {
+    //             rendererFactory: L.canvas.tile,
+    //             vectorTileLayerStyles: {
+    //                 'grid': function(properties, zoom) {
+    //                     // console.log(properties);
+    //                     return {
+    //                         fillColor: '#f1c40f',
+    //                         fillOpacity: properties.prob_injury * 3,
+    //                         stroke: properties.prob_injury > 0 ? true : false,
+    //                         fill: true,
+    //                         color: '#bdc3c7',
+    //                         weight: .01,
+    //                     }
+    //                 }
+    //             }
+
+    //         }).addTo(map);
+    //     });
+
+    // fetch('data/grid.topojson').then(function(response){
+    //         return response.json();
+    //     }).then(function(json){
+
+    //         console.log(json);
+
+    //         var vectorGrid = L.vectorGrid.slicer( json, {
+    //             rendererFactory: L.canvas.tile,
+    //             vectorTileLayerStyles: {
+    //                 'grid': function(properties, zoom) {
+    //                     // console.log(properties);
+    //                     return {
+    //                         fillColor: '#3498db',
+    //                         fillOpacity: properties.prob_acc,
+    //                         stroke: true,
+    //                         fill: true,
+    //                         color: 'black',
+    //                         weight: 2,
+    //                     }
+    //                 }
+    //             }
+
+    //         }).addTo(map);
+    //     });
+
+</script>
+</body>
+</html>

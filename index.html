@@ -36,11 +36,11 @@
         }
     })
 
-    omnivore.geojson('raster/PA.geojson', null, stateLayer).addTo(map);
+    omnivore.geojson('vector/PA.geojson', null, stateLayer).addTo(map);
     // omnivore.topojson('data/grid.topojson').addTo(map);
 
     // Add large TopoJSON
-    fetch('raster/grid.topojson').then(function(response){
+    fetch('vector/grid.topojson').then(function(response){
             return response.json();
         }).then(function(json){
 
